@@ -1,3 +1,4 @@
+from urllib.parse import urlparse
 import logging
 import sys
 
@@ -42,10 +43,11 @@ class DynamoDBSQL(BaseSQLQueryRunner):
             "type": "object",
             "properties": {
                 "region": {"type": "string", "default": "us-east-1"},
+                "endpoint_url": {"type": "string"},
                 "access_key": {"type": "string"},
                 "secret_key": {"type": "string"},
             },
-            "required": ["access_key", "secret_key"],
+            "required": [],
             "secret": ["secret_key"],
         }
 
@@ -64,6 +66,19 @@ class DynamoDBSQL(BaseSQLQueryRunner):
     def _connect(self):
         engine = FragmentEngine()
         config = self.configuration.to_dict()
+
+        if config.get("endpoint_url"):
+            endpoint_url_parsed = urlparse(config["endpoint_url"])
+            if not endpoint_url_parsed.scheme:
+                endpoint_url_parsed = urlparse("https://" + config["endpoint_url"])
+            elif endpoint_url_parsed.scheme == "http":
+                config["is_secure"] = False
+            config["host"] = endpoint_url_parsed.hostname
+            if endpoint_url_parsed.port:
+                config["port"] = endpoint_url_parsed.port
+            elif endpoint_url_parsed.scheme == "https":
+                config["port"] = 443
+            config.pop('endpoint_url')
 
         if not config.get("region"):
             config["region"] = "us-east-1"
